@@ -271,6 +271,85 @@ def log_stage(article_id: int, stage: str, status: str, message: str = ""):
         })
 
 
+def upsert_processed_articles(rows: list[dict]):
+    """
+    Batch insert/update into processed_news. Uses INSERT ... ON DUPLICATE KEY
+    UPDATE so re-running on already-processed (or previously FAILED)
+    articles works without needing a separate delete step first.
+
+    Input: list of dicts, each matching processed_news columns. Missing
+    keys default to NULL / current pipeline_version.
+    """
+    if not rows:
+        return
+
+    from datetime import datetime
+    columns = [
+        "article_id", "title_original", "title_clean", "content_original",
+        "content_clean", "date_raw", "published_at", "publication_date",
+        "publication_year", "publication_month", "publication_week",
+        "publication_day", "article_length_words", "article_length_chars",
+        "sentence_count", "duplicate_status", "duplicate_of", "content_hash",
+        "processing_status", "processing_timestamp", "pipeline_version",
+    ]
+    placeholders = ", ".join(f":{c}" for c in columns)
+    col_list = ", ".join(columns)
+    update_clause = ", ".join(f"{c}=VALUES({c})" for c in columns if c != "article_id")
+
+    query = f"""
+        INSERT INTO processed_news ({col_list})
+        VALUES ({placeholders})
+        ON DUPLICATE KEY UPDATE {update_clause}
+    """
+
+    now = datetime.now()
+    prepared = []
+    for row in rows:
+        r = {c: row.get(c) for c in columns}
+        r["processing_timestamp"] = now
+        r.setdefault("pipeline_version", config.PIPELINE_VERSION)
+        r["pipeline_version"] = row.get("pipeline_version", config.PIPELINE_VERSION)
+        prepared.append(r)
+
+    with get_connection() as conn:
+        conn.execute(text(query), prepared)
+
+
+def get_existing_content_hashes() -> set[str]:
+    """Returns the set of all content_hash values already in processed_news
+    (used for exact-duplicate checks when processing a single new article)."""
+    query = "SELECT DISTINCT content_hash FROM processed_news WHERE content_hash IS NOT NULL"
+    with get_connection() as conn:
+        return {row[0] for row in conn.execute(text(query))}
+
+
+def get_processed_articles_by_date(publication_date) -> list[dict]:
+    """
+    Returns already-processed articles published on the given date
+    (used for near-duplicate comparison when processing a single new article
+    against same-day articles already in the DB).
+    """
+    query = """
+        SELECT article_id, content_clean, link
+        FROM processed_news pn
+        JOIN scraped_news sn ON pn.article_id = sn.id
+        WHERE pn.publication_date = :pdate AND pn.duplicate_status != 'EXACT_DUPLICATE'
+    """
+    with get_connection() as conn:
+        result = conn.execute(text(query), {"pdate": publication_date}).mappings().all()
+        return [dict(r) for r in result]
+
+
+def get_article_id_by_content_hash(content_hash: str) -> int | None:
+    """Returns the article_id of the first processed_news row with this
+    content_hash, or None. Used for single-article exact-duplicate lookup
+    in pipeline.process_new_article()."""
+    query = "SELECT article_id FROM processed_news WHERE content_hash = :h LIMIT 1"
+    with get_connection() as conn:
+        result = conn.execute(text(query), {"h": content_hash}).first()
+        return result[0] if result else None
+
+
 if __name__ == "__main__":
     # Running this file directly does a full setup check.
     test_connection()
