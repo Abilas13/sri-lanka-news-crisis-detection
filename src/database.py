@@ -1,0 +1,278 @@
+"""
+database.py
+
+Purpose
+-------
+Single place for all database connectivity and schema management.
+Every other module imports get_engine() / get_connection() from here rather
+than opening its own MySQL connection.
+
+Input
+-----
+Reads connection settings from config.py (which reads from .env).
+
+Output
+------
+- A SQLAlchemy Engine for the project's MySQL database.
+- init_schema(): creates the 8 processed-data tables if they don't exist.
+  Never touches or alters `scraped_news`.
+
+Notes
+-----
+- Uses SQLAlchemy Core (raw SQL via text()) rather than an ORM, since the
+  schema is small and fixed — this keeps things simple and readable, which
+  matters more than ORM abstraction for a project this size.
+- Schema DDL lives in sql/create_tables.sql and sql/indexes.sql, not in this
+  file — init_schema() reads and executes those files. This keeps the SQL
+  reviewable/editable on its own, separate from Python logic.
+- All CREATE TABLE statements use `IF NOT EXISTS`, so init_schema() is safe
+  to run repeatedly. Index creation is NOT re-run-safe on every MySQL
+  version (CREATE INDEX has no IF NOT EXISTS in older MySQL), so
+  init_schema() only creates indexes the first time — see create_indexes().
+"""
+
+import os
+from pathlib import Path
+from contextlib import contextmanager
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError, ProgrammingError
+
+import config
+
+# Project root is one level up from src/
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_SQL_DIR = _PROJECT_ROOT / "sql"
+
+_engine = None
+
+
+def get_engine():
+    """
+    Returns a singleton SQLAlchemy engine connected to the MySQL database.
+    Creating the engine does not open a connection immediately — SQLAlchemy
+    connects lazily on first use, and pools connections after that.
+    """
+    global _engine
+    if _engine is None:
+        _engine = create_engine(config.DB_URL, pool_pre_ping=True, future=True)
+    return _engine
+
+
+@contextmanager
+def get_connection():
+    """
+    Context manager yielding a live DB connection, committing on success
+    and rolling back on error. Use like:
+
+        with get_connection() as conn:
+            conn.execute(text("SELECT ..."))
+    """
+    engine = get_engine()
+    conn = engine.connect()
+    try:
+        yield conn
+        conn.commit()
+    except SQLAlchemyError:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def test_connection() -> bool:
+    """
+    Quick sanity check that credentials and network access are correct.
+    Returns True on success, raises a clear error otherwise.
+    """
+    try:
+        with get_connection() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except OperationalError as e:
+        raise ConnectionError(
+            f"Could not connect to MySQL at {config.DB_HOST}:{config.DB_PORT}/"
+            f"{config.DB_NAME}. Check your .env credentials. Original error: {e}"
+        ) from e
+
+
+# ---------------------------------------------------------------------------
+# Schema (DDL lives in sql/create_tables.sql and sql/indexes.sql)
+# ---------------------------------------------------------------------------
+
+def _read_sql_statements(filename: str) -> list[str]:
+    """
+    Reads a .sql file and splits it into individual executable statements.
+
+    Comment lines (starting with --) are stripped line-by-line BEFORE
+    splitting on semicolons. This matters: a leading comment block with no
+    semicolon of its own would otherwise get glued onto the next statement
+    when splitting naively, making the merged chunk start with "--" and
+    causing the whole statement (comment AND the real SQL after it) to be
+    mistaken for a comment-only fragment and silently dropped.
+    """
+    path = _SQL_DIR / filename
+    if not path.exists():
+        raise FileNotFoundError(f"Expected SQL file not found: {path}")
+
+    raw = path.read_text(encoding="utf-8")
+
+    # Strip comment lines individually, BEFORE splitting on ";"
+    code_lines = []
+    for line in raw.splitlines():
+        if line.strip().startswith("--"):
+            continue
+        code_lines.append(line)
+    code_only = "\n".join(code_lines)
+
+    statements = []
+    for chunk in code_only.split(";"):
+        stmt = chunk.strip()
+        if stmt:
+            statements.append(stmt)
+    return statements
+
+
+def create_tables():
+    """
+    Executes every statement in sql/create_tables.sql — table creation first
+    (safe to re-run via IF NOT EXISTS), then foreign key ALTER TABLE
+    statements. Commits after EVERY statement individually (not just at the
+    end) — MySQL 8's atomic DDL can otherwise roll back an earlier
+    successful CREATE/ALTER together with a later failing one if they share
+    an uncommitted transaction. A duplicate-constraint error on re-run is
+    treated as a no-op rather than a failure.
+    """
+    engine = get_engine()
+    with engine.connect() as conn:
+        for statement in _read_sql_statements("create_tables.sql"):
+            try:
+                conn.execute(text(statement))
+                conn.commit()   # commit immediately, don't batch with later statements
+            except ProgrammingError as e:
+                conn.rollback()
+                if "Duplicate" in str(e) or "already exists" in str(e):
+                    continue
+                raise
+    print("create_tables.sql applied.")
+
+
+def create_indexes():
+    """
+    Executes every statement in sql/indexes.sql.
+    Commits after every statement individually, same reasoning as
+    create_tables(). CREATE INDEX has no IF NOT EXISTS in MySQL, so a
+    duplicate-index error on re-run is caught and treated as a no-op.
+
+    Each statement gets one retry after a short delay if it fails — this
+    quietly absorbs the transient "table doesn't exist" error some Windows
+    setups produce when antivirus briefly locks a just-created InnoDB file.
+    """
+    import time
+    engine = get_engine()
+    with engine.connect() as conn:
+        for statement in _read_sql_statements("indexes.sql"):
+            for attempt in (1, 2):
+                try:
+                    conn.execute(text(statement))
+                    conn.commit()
+                    break
+                except ProgrammingError as e:
+                    conn.rollback()
+                    if "Duplicate key name" in str(e):
+                        break  # index already exists, fine
+                    if attempt == 1:
+                        time.sleep(1.5)  # give the OS/AV a moment, then retry once
+                        continue
+                    raise
+    print("indexes.sql applied.")
+
+
+def init_schema():
+    """
+    Full schema setup: tables first (required), then indexes (best-effort).
+    Safe to call every time the app starts. Does NOT touch scraped_news.
+
+    Index creation is wrapped in a try/except: indexes are a performance
+    optimization, not something correctness depends on, and on some Windows
+    setups antivirus software briefly locks a freshly-written InnoDB table
+    file right after creation, causing the very next statement touching it
+    to fail spuriously. If that happens here, tables are still fully usable
+    — just re-run create_indexes() on its own later (e.g. after a few
+    seconds, or directly in MySQL Workbench) to pick up any indexes that
+    didn't get created.
+    """
+    create_tables()
+    try:
+        create_indexes()
+    except SQLAlchemyError as e:
+        print(
+            "WARNING: index creation failed (tables themselves are fine and "
+            "usable). This is often a transient Windows/antivirus file-lock "
+            "issue right after table creation, not a schema problem. "
+            "You can safely continue — re-run create_indexes() later to retry.\n"
+            f"Original error: {e}"
+        )
+    print("Schema check complete: all processed-data tables exist (indexes best-effort).")
+
+
+def get_unprocessed_article_ids(limit: int = None) -> list[int]:
+    """
+    Returns article_ids from scraped_news that either:
+      - have no row yet in processed_news, or
+      - have processing_status = 'FAILED' (so they get retried)
+
+    Input:  optional limit (int) to cap batch size
+    Output: list of integer ids
+    """
+    query = f"""
+        SELECT s.id
+        FROM {config.RAW_TABLE} s
+        LEFT JOIN processed_news p ON s.id = p.article_id
+        WHERE p.article_id IS NULL OR p.processing_status = 'FAILED'
+        ORDER BY s.id
+    """
+    if limit:
+        query += f" LIMIT {int(limit)}"
+
+    with get_connection() as conn:
+        result = conn.execute(text(query))
+        return [row[0] for row in result]
+
+
+def get_raw_article(article_id: int) -> dict | None:
+    """
+    Fetches a single raw article from scraped_news by id.
+    Returns a dict with keys: id, title, content, date, link — or None if
+    not found.
+    """
+    query = f"SELECT id, title, content, date, link FROM {config.RAW_TABLE} WHERE id = :aid"
+    with get_connection() as conn:
+        result = conn.execute(text(query), {"aid": article_id}).mappings().first()
+        return dict(result) if result else None
+
+
+def log_stage(article_id: int, stage: str, status: str, message: str = ""):
+    """
+    Writes one row to processing_log. Called by every pipeline stage so
+    failures are traceable without stopping the whole batch.
+    """
+    from datetime import datetime
+    query = """
+        INSERT INTO processing_log (article_id, stage, status, message, timestamp)
+        VALUES (:aid, :stage, :status, :message, :ts)
+    """
+    with get_connection() as conn:
+        conn.execute(text(query), {
+            "aid": article_id,
+            "stage": stage,
+            "status": status,
+            "message": message,
+            "ts": datetime.now(),
+        })
+
+
+if __name__ == "__main__":
+    # Running this file directly does a full setup check.
+    test_connection()
+    print("Connection OK.")
+    init_schema()
