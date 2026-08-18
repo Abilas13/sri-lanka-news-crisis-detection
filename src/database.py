@@ -350,6 +350,97 @@ def get_article_id_by_content_hash(content_hash: str) -> int | None:
         return result[0] if result else None
 
 
+def get_articles_needing_sentiment(limit: int = None) -> list[dict]:
+    """
+    Returns COMPLETED articles that don't have an article_sentiment row yet.
+    Used by sentiment.process_all_sentiment().
+    """
+    query = """
+        SELECT pn.article_id, pn.content_clean
+        FROM processed_news pn
+        LEFT JOIN article_sentiment s ON pn.article_id = s.article_id
+        WHERE pn.processing_status = 'COMPLETED' AND s.article_id IS NULL
+        ORDER BY pn.article_id
+    """
+    if limit:
+        query += f" LIMIT {int(limit)}"
+    with get_connection() as conn:
+        result = conn.execute(text(query)).mappings().all()
+        return [dict(r) for r in result]
+
+
+def upsert_article_sentiment(rows: list[dict]):
+    """
+    Batch insert/update into article_sentiment.
+    Input: list of dicts with article_id, sentiment, sentiment_score, sentiment_model.
+    """
+    if not rows:
+        return
+    query = """
+        INSERT INTO article_sentiment (article_id, sentiment, sentiment_score, sentiment_model)
+        VALUES (:article_id, :sentiment, :sentiment_score, :sentiment_model)
+        ON DUPLICATE KEY UPDATE
+            sentiment = VALUES(sentiment),
+            sentiment_score = VALUES(sentiment_score),
+            sentiment_model = VALUES(sentiment_model)
+    """
+    with get_connection() as conn:
+        conn.execute(text(query), rows)
+
+
+def get_articles_for_topic_modeling(limit: int = None) -> list[dict]:
+    """Returns all COMPLETED articles' title_clean + content_clean for BERTopic fitting."""
+    query = """
+        SELECT article_id, title_clean, content_clean
+        FROM processed_news
+        WHERE processing_status = 'COMPLETED'
+        ORDER BY article_id
+    """
+    if limit:
+        query += f" LIMIT {int(limit)}"
+    with get_connection() as conn:
+        result = conn.execute(text(query)).mappings().all()
+        return [dict(r) for r in result]
+
+
+def clear_article_topics():
+    """Deletes all article_topics rows — used before a full refit, since
+    topic_id numbering changes each time BERTopic is refit on the corpus."""
+    with get_connection() as conn:
+        conn.execute(text("DELETE FROM article_topics"))
+
+
+def upsert_article_topics(rows: list[dict]):
+    """
+    Batch insert into article_topics.
+    Input: list of dicts with article_id, topic_id, topic_name, topic_probability.
+    """
+    if not rows:
+        return
+    query = """
+        INSERT INTO article_topics (article_id, topic_id, topic_name, topic_probability)
+        VALUES (:article_id, :topic_id, :topic_name, :topic_probability)
+        ON DUPLICATE KEY UPDATE
+            topic_name = VALUES(topic_name),
+            topic_probability = VALUES(topic_probability)
+    """
+    with get_connection() as conn:
+        conn.execute(text(query), rows)
+
+
+def update_topic_names(name_mapping: dict[int, str]):
+    """
+    Updates topic_name for every article_topics row matching each topic_id
+    in the mapping. Used by topics.apply_topic_names().
+    """
+    if not name_mapping:
+        return
+    query = "UPDATE article_topics SET topic_name = :name WHERE topic_id = :tid"
+    params = [{"tid": tid, "name": name} for tid, name in name_mapping.items()]
+    with get_connection() as conn:
+        conn.execute(text(query), params)
+
+
 if __name__ == "__main__":
     # Running this file directly does a full setup check.
     test_connection()
