@@ -441,6 +441,77 @@ def update_topic_names(name_mapping: dict[int, str]):
         conn.execute(text(query), params)
 
 
+def get_articles_needing_keywords(limit: int = None) -> list[dict]:
+    """
+    Returns COMPLETED articles that don't have any article_keywords rows yet.
+    Used by keywords.process_all_keywords().
+    """
+    query = """
+        SELECT pn.article_id, pn.content_clean
+        FROM processed_news pn
+        LEFT JOIN article_keywords k ON pn.article_id = k.article_id
+        WHERE pn.processing_status = 'COMPLETED' AND k.article_id IS NULL
+        ORDER BY pn.article_id
+    """
+    if limit:
+        query += f" LIMIT {int(limit)}"
+    with get_connection() as conn:
+        result = conn.execute(text(query)).mappings().all()
+        return [dict(r) for r in result]
+
+
+def upsert_article_keywords(rows: list[dict]):
+    """
+    Batch insert into article_keywords.
+    Input: list of dicts with article_id, keyword, score, rank.
+    """
+    if not rows:
+        return
+    query = """
+        INSERT INTO article_keywords (article_id, keyword, score, `rank`)
+        VALUES (:article_id, :keyword, :score, :rank)
+        ON DUPLICATE KEY UPDATE
+            keyword = VALUES(keyword),
+            score = VALUES(score)
+    """
+    with get_connection() as conn:
+        conn.execute(text(query), rows)
+
+
+def get_articles_for_keywords(limit: int = None) -> list[dict]:
+    """Returns COMPLETED articles that don't have article_keywords rows yet."""
+    query = """
+        SELECT pn.article_id, pn.content_clean
+        FROM processed_news pn
+        LEFT JOIN article_keywords k ON pn.article_id = k.article_id
+        WHERE pn.processing_status = 'COMPLETED' AND k.article_id IS NULL
+        ORDER BY pn.article_id
+    """
+    if limit:
+        query += f" LIMIT {int(limit)}"
+    with get_connection() as conn:
+        result = conn.execute(text(query)).mappings().all()
+        return [dict(r) for r in result]
+
+
+def upsert_article_keywords(rows: list[dict]):
+    """
+    Batch insert into article_keywords.
+    Input: list of dicts with article_id, keyword, score, rank.
+    """
+    if not rows:
+        return
+    query = """
+        INSERT INTO article_keywords (article_id, keyword, score, `rank`)
+        VALUES (:article_id, :keyword, :score, :rank)
+        ON DUPLICATE KEY UPDATE
+            keyword = VALUES(keyword),
+            score = VALUES(score)
+    """
+    with get_connection() as conn:
+        conn.execute(text(query), rows)
+
+
 if __name__ == "__main__":
     # Running this file directly does a full setup check.
     test_connection()
