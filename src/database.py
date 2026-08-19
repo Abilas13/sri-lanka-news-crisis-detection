@@ -478,13 +478,16 @@ def upsert_article_keywords(rows: list[dict]):
         conn.execute(text(query), rows)
 
 
-def get_articles_for_keywords(limit: int = None) -> list[dict]:
-    """Returns COMPLETED articles that don't have article_keywords rows yet."""
+def get_articles_needing_ner(limit: int = None) -> list[dict]:
+    """
+    Returns COMPLETED articles that don't have any article_entities rows yet.
+    Used by ner.process_all_ner().
+    """
     query = """
         SELECT pn.article_id, pn.content_clean
         FROM processed_news pn
-        LEFT JOIN article_keywords k ON pn.article_id = k.article_id
-        WHERE pn.processing_status = 'COMPLETED' AND k.article_id IS NULL
+        LEFT JOIN article_entities e ON pn.article_id = e.article_id
+        WHERE pn.processing_status = 'COMPLETED' AND e.article_id IS NULL
         ORDER BY pn.article_id
     """
     if limit:
@@ -494,19 +497,54 @@ def get_articles_for_keywords(limit: int = None) -> list[dict]:
         return [dict(r) for r in result]
 
 
-def upsert_article_keywords(rows: list[dict]):
+def upsert_article_entities(rows: list[dict]):
     """
-    Batch insert into article_keywords.
-    Input: list of dicts with article_id, keyword, score, rank.
+    Batch insert into article_entities.
+    Input: list of dicts with article_id, entity, entity_type, confidence.
     """
     if not rows:
         return
     query = """
-        INSERT INTO article_keywords (article_id, keyword, score, `rank`)
-        VALUES (:article_id, :keyword, :score, :rank)
+        INSERT INTO article_entities (article_id, entity, entity_type, confidence)
+        VALUES (:article_id, :entity, :entity_type, :confidence)
         ON DUPLICATE KEY UPDATE
-            keyword = VALUES(keyword),
-            score = VALUES(score)
+            confidence = VALUES(confidence)
+    """
+    with get_connection() as conn:
+        conn.execute(text(query), rows)
+
+
+def get_articles_needing_entities(limit: int = None) -> list[dict]:
+    """
+    Returns COMPLETED articles that don't have any article_entities rows yet.
+    Used by ner.process_all_entities().
+    """
+    query = """
+        SELECT pn.article_id, pn.content_clean
+        FROM processed_news pn
+        LEFT JOIN article_entities e ON pn.article_id = e.article_id
+        WHERE pn.processing_status = 'COMPLETED' AND e.article_id IS NULL
+        ORDER BY pn.article_id
+    """
+    if limit:
+        query += f" LIMIT {int(limit)}"
+    with get_connection() as conn:
+        result = conn.execute(text(query)).mappings().all()
+        return [dict(r) for r in result]
+
+
+def upsert_article_entities(rows: list[dict]):
+    """
+    Batch insert into article_entities.
+    Input: list of dicts with article_id, entity, entity_type, confidence.
+    """
+    if not rows:
+        return
+    query = """
+        INSERT INTO article_entities (article_id, entity, entity_type, confidence)
+        VALUES (:article_id, :entity, :entity_type, :confidence)
+        ON DUPLICATE KEY UPDATE
+            confidence = VALUES(confidence)
     """
     with get_connection() as conn:
         conn.execute(text(query), rows)
