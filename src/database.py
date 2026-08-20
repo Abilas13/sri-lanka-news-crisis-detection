@@ -514,40 +514,124 @@ def upsert_article_entities(rows: list[dict]):
         conn.execute(text(query), rows)
 
 
-def get_articles_needing_entities(limit: int = None) -> list[dict]:
+def get_article_level_dataset() -> list[dict]:
     """
-    Returns COMPLETED articles that don't have any article_entities rows yet.
-    Used by ner.process_all_entities().
+    Returns the core article-level dataset for temporal aggregation: one row
+    per non-exact-duplicate COMPLETED article, with its week, sentiment, and
+    dominant topic. EXACT_DUPLICATE articles are excluded so they don't
+    inflate weekly counts; NEAR_DUPLICATE and UNIQUE are both kept (a
+    near-duplicate is still a genuine, distinct piece of coverage).
     """
     query = """
-        SELECT pn.article_id, pn.content_clean
+        SELECT
+            pn.article_id,
+            pn.publication_week,
+            s.sentiment,
+            s.sentiment_score,
+            t.topic_name
         FROM processed_news pn
-        LEFT JOIN article_entities e ON pn.article_id = e.article_id
-        WHERE pn.processing_status = 'COMPLETED' AND e.article_id IS NULL
-        ORDER BY pn.article_id
+        LEFT JOIN article_sentiment s ON pn.article_id = s.article_id
+        LEFT JOIN article_topics t ON pn.article_id = t.article_id
+        WHERE pn.processing_status = 'COMPLETED'
+          AND pn.duplicate_status != 'EXACT_DUPLICATE'
+          AND pn.publication_week IS NOT NULL
+        ORDER BY pn.publication_week
     """
-    if limit:
-        query += f" LIMIT {int(limit)}"
     with get_connection() as conn:
         result = conn.execute(text(query)).mappings().all()
         return [dict(r) for r in result]
 
 
-def upsert_article_entities(rows: list[dict]):
+def get_keyword_dataset() -> list[dict]:
     """
-    Batch insert into article_entities.
-    Input: list of dicts with article_id, entity, entity_type, confidence.
+    Returns article_id + keyword pairs joined with publication_week, for
+    keyword-frequency aggregation. Same filtering as get_article_level_dataset.
+    """
+    query = """
+        SELECT k.article_id, pn.publication_week, k.keyword
+        FROM article_keywords k
+        JOIN processed_news pn ON k.article_id = pn.article_id
+        WHERE pn.processing_status = 'COMPLETED'
+          AND pn.duplicate_status != 'EXACT_DUPLICATE'
+          AND pn.publication_week IS NOT NULL
+    """
+    with get_connection() as conn:
+        result = conn.execute(text(query)).mappings().all()
+        return [dict(r) for r in result]
+
+
+def get_entity_dataset() -> list[dict]:
+    """
+    Returns article_id + entity_type pairs joined with publication_week, for
+    entity-type-frequency aggregation. Same filtering as above.
+    """
+    query = """
+        SELECT e.article_id, pn.publication_week, e.entity_type
+        FROM article_entities e
+        JOIN processed_news pn ON e.article_id = pn.article_id
+        WHERE pn.processing_status = 'COMPLETED'
+          AND pn.duplicate_status != 'EXACT_DUPLICATE'
+          AND pn.publication_week IS NOT NULL
+    """
+    with get_connection() as conn:
+        result = conn.execute(text(query)).mappings().all()
+        return [dict(r) for r in result]
+
+
+def upsert_temporal_features(rows: list[dict]):
+    """
+    Batch insert/update into temporal_features (one row per week).
+    Input: list of dicts — missing keys default to NULL.
     """
     if not rows:
         return
-    query = """
-        INSERT INTO article_entities (article_id, entity, entity_type, confidence)
-        VALUES (:article_id, :entity, :entity_type, :confidence)
-        ON DUPLICATE KEY UPDATE
-            confidence = VALUES(confidence)
+
+    columns = [
+        "week", "article_count", "average_sentiment",
+        "negative_sentiment_ratio", "positive_sentiment_ratio",
+        "fuel_topic_frequency", "iran_war_topic_frequency",
+        "electricity_topic_frequency", "corruption_topic_frequency",
+        "healthcare_strike_topic_frequency", "consumer_prices_topic_frequency",
+        "disaster_recovery_topic_frequency",
+        "fuel_keyword_frequency", "shortage_keyword_frequency",
+        "protest_keyword_frequency", "crisis_keyword_frequency",
+        "person_entity_frequency", "organization_entity_frequency",
+        "location_entity_frequency", "event_entity_frequency", "money_entity_frequency",
+        "article_count_change", "sentiment_change",
+        "topic_growth_rate", "keyword_growth_rate", "entity_growth_rate",
+        "ma_4week", "ma_8week", "anomaly_score",
+        "crisis_event", "days_to_crisis", "label_pre_crisis",
+    ]
+    placeholders = ", ".join(f":{c}" for c in columns)
+    col_list = ", ".join(columns)
+    update_clause = ", ".join(f"{c}=VALUES({c})" for c in columns if c != "week")
+
+    query = f"""
+        INSERT INTO temporal_features ({col_list})
+        VALUES ({placeholders})
+        ON DUPLICATE KEY UPDATE {update_clause}
     """
+
+    prepared = [{c: row.get(c) for c in columns} for row in rows]
+
     with get_connection() as conn:
-        conn.execute(text(query), rows)
+        conn.execute(text(query), prepared)
+
+
+def get_temporal_features() -> list[dict]:
+    """Returns the full temporal_features table as a list of dicts, ordered by week."""
+    query = "SELECT * FROM temporal_features ORDER BY week"
+    with get_connection() as conn:
+        result = conn.execute(text(query)).mappings().all()
+        return [dict(r) for r in result]
+
+
+def get_crisis_events() -> list[dict]:
+    """Returns all rows from crisis_events."""
+    query = "SELECT event_id, event_name, crisis_type, start_date, end_date, description FROM crisis_events"
+    with get_connection() as conn:
+        result = conn.execute(text(query)).mappings().all()
+        return [dict(r) for r in result]
 
 
 if __name__ == "__main__":

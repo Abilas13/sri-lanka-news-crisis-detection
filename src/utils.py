@@ -50,6 +50,17 @@ def iso_week_string(dt: datetime) -> str:
     return f"{iso_year}-W{iso_week:02d}"
 
 
+def week_string_to_monday(week_str: str):
+    """
+    Converts an ISO week string like '2026-W09' back to a date — the Monday
+    of that week. Used to compute days-to-crisis by comparing a week's
+    representative date against a crisis event's start_date.
+    """
+    from datetime import date
+    year_part, week_part = week_str.split("-W")
+    return date.fromisocalendar(int(year_part), int(week_part), 1)  # day 1 = Monday
+
+
 def safe_divide(numerator: float, denominator: float) -> float | None:
     """Returns None instead of raising on divide-by-zero — used in growth-rate calcs."""
     if not denominator:
