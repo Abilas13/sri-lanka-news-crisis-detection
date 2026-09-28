@@ -1,9 +1,6 @@
 """
 test_crisis_analysis.py
 
-How to run:
-    python tests/test_crisis_analysis.py
-
 Pure pandas/math logic — tests use synthetic data shaped like the real
 fuel-crisis pattern actually observed in the dataset (baseline ~0-5,
 jumping to 60+ at crisis onset), plus edge cases around window boundaries.

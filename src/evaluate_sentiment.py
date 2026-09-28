@@ -7,21 +7,6 @@ Compares the model's sentiment predictions against your hand-labeled
 true_sentiment column, producing the evaluation metrics your research
 write-up needs (Step 7 requirement).
 
-How to run
-----------
-From the project root:
-    python src/evaluate_sentiment.py
-
-Or in a notebook cell:
-    import sys; sys.path.insert(0, '../src')
-    import evaluate_sentiment
-    evaluate_sentiment.run()
-
-Expects data/processed/sentiment_eval_sample.csv with columns:
-    article_id, title_clean, content_clean, sentiment, sentiment_score, true_sentiment
-
-(sentiment = model's prediction, already in the CSV from get_sentiment_eval_sample()
- + your article_sentiment join — see note below if 'sentiment' isn't in your CSV yet)
 """
 
 import pandas as pd

@@ -5,27 +5,6 @@ Purpose
 -------
 Step 5: flag exact and near-duplicate articles. Never deletes anything —
 only annotates duplicate_status / duplicate_of / content_hash.
-
-Input
------
-A pandas DataFrame with at least: article_id, content_clean, link,
-publication_date (from date_processing.py's output).
-
-Output
-------
-The same DataFrame with three new columns:
-    content_hash     - sha256 of normalized content
-    duplicate_status  - 'UNIQUE' | 'EXACT_DUPLICATE' | 'NEAR_DUPLICATE'
-    duplicate_of      - article_id of the original, or None
-
-Design note on near-duplicates
--------------------------------
-Full pairwise TF-IDF cosine similarity across the whole corpus (16k+
-articles) is O(n^2) and mostly wasted work — near-duplicates (republished
-or syndicated versions of the same story) almost always appear within the
-same day or two, not months apart. So near-duplicate comparison is scoped
-to same-day groups only. This keeps runtime reasonable without sacrificing
-the cases that actually matter for this research.
 """
 
 import pandas as pd

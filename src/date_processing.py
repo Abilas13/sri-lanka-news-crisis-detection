@@ -6,27 +6,6 @@ Purpose
 Converts the raw `date` string from scraped_news (confirmed format: "DD Mon YYYY",
 e.g. "01 Apr 2026") into a proper timestamp plus the derived temporal columns
 that publication_week-based aggregation depends on.
-
-Input
------
-A single raw date string, e.g. "01 Apr 2026".
-
-Output
-------
-A dict with keys matching processed_news columns:
-    date_raw, published_at, publication_date, publication_year,
-    publication_month, publication_week, publication_day, date_parse_status
-
-date_parse_status is 'OK' or 'FAILED' — failed rows are NEVER given an
-invented date. Downstream code must check this before trusting the other
-fields.
-
-Note on granularity
--------------------
-This format has day-level granularity only (no time-of-day). published_at
-is stored as midnight on the given date. This is fine for weekly
-aggregation (the core of this research) but means daily-level analysis
-would have no finer resolution than "which day", not "what time of day".
 """
 
 from datetime import datetime

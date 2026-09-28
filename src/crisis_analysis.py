@@ -1,40 +1,4 @@
-"""
-crisis_analysis.py
 
-Purpose
--------
-Steps 14-16 and 18:
-  14. Historical crisis dataset (crisis_events — already populated separately,
-      see sql/cleanup_crisis_events.sql)
-  15. Pre-crisis window labeling
-  16. Early-signal analysis (rolling z-score anomaly detection)
-  18. Avoid data leakage (all calculations here are strictly backward-looking)
-
-Input
------
-The weekly temporal_features table (built by temporal_analysis.py) and
-crisis_events.
-
-Output
-------
-Updates temporal_features with: crisis_event, days_to_crisis,
-label_pre_crisis, anomaly_score.
-
-Methodology
------------
-- PRE_CRISIS_WINDOW_DAYS defines how many days before a crisis's start_date
-  count as "pre-crisis" (label_pre_crisis=1). Weeks further away are
-  "normal" (label_pre_crisis=0). Weeks DURING a crisis (between start_date
-  and end_date) are explicitly excluded from either label (set to NULL) —
-  per the brief's no-leakage rule, you're testing EARLY detection, not
-  classifying the crisis period itself.
-- anomaly_score: for each of a small set of key metrics, a rolling z-score
-  is computed using a TRAILING window that excludes the current week
-  (mean/std computed from weeks[t-window : t-1], never including week t
-  itself or any future week). anomaly_score is the max absolute z-score
-  across tracked metrics for that week — an interpretable "how unusual is
-  this week" summary.
-"""
 
 import pandas as pd
 import numpy as np

@@ -3,36 +3,12 @@ modeling.py
 
 Purpose
 -------
-Steps 17, 19, 20 — the final research output:
-  17. ML classification (Logistic Regression + Random Forest)
-  19. Evaluation (precision/recall/F1/ROC-AUC/PR-AUC/confusion matrix)
-  20. Lead-time analysis — the headline result: how many days before each
-      crisis did the model first flag an elevated pre-crisis probability?
 
-Step 18 (avoid data leakage) is handled by construction: features are all
-backward-looking (built in temporal_analysis.py / crisis_analysis.py), and
-validation uses leave-one-crisis-out — the model NEVER sees the crisis
-it's being tested on, in either its pre-crisis or normal weeks.
+ML classification (Logistic Regression + Random Forest)
+Evaluation (precision/recall/F1/ROC-AUC/PR-AUC/confusion matrix)
+Lead-time analysis — the headline result: how many days before each
+crisis did the model first flag an elevated pre-crisis probability?
 
-Small-sample caveat
----------------------
-With only 2 usable crisis events and roughly 3-8 pre-crisis-labeled weeks
-each, this is a small dataset for ML in the conventional sense. Results
-here should be reported as exploratory/indicative, not a high-confidence
-production classifier — say so explicitly in your write-up. This is also
-why leave-one-crisis-out (not a large held-out test set) is the right
-validation choice, per the original methodology.
-
-Feature set
------------
-A deliberately compact set (not all 29+ columns in temporal_features) —
-mirrors the brief's Step 17 example list, avoiding overfitting risk on
-~80 rows:
-    article_count, negative_sentiment_ratio, positive_sentiment_ratio,
-    average_sentiment, fuel_topic_frequency, iran_war_topic_frequency,
-    disaster_recovery_topic_frequency, article_count_change,
-    sentiment_change, topic_growth_rate, keyword_growth_rate,
-    entity_growth_rate, ma_4week, ma_8week, anomaly_score
 """
 
 import pandas as pd
@@ -112,6 +88,8 @@ def train_and_evaluate_loco(df: pd.DataFrame = None) -> dict:
     """
     from sklearn.linear_model import LogisticRegression
     from sklearn.ensemble import RandomForestClassifier
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.pipeline import Pipeline
 
     if df is None:
         df = get_ml_dataset()
@@ -244,7 +222,7 @@ def run_full_evaluation(threshold: float = 0.5):
         print()
 
     crisis_events = ca.get_crisis_events()
-    print("=== Lead-Time Analysis (Random Forest, threshold=0.5) ===")
+    print(f"=== Lead-Time Analysis (Random Forest, threshold={threshold}) ===")
     lead_time_df = compute_lead_time(results["_predictions"], crisis_events, threshold=threshold)
     print(lead_time_df.to_string(index=False))
 

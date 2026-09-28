@@ -1,34 +1,11 @@
 """
 database.py
-
 Purpose
 -------
 Single place for all database connectivity and schema management.
 Every other module imports get_engine() / get_connection() from here rather
 than opening its own MySQL connection.
 
-Input
------
-Reads connection settings from config.py (which reads from .env).
-
-Output
-------
-- A SQLAlchemy Engine for the project's MySQL database.
-- init_schema(): creates the 8 processed-data tables if they don't exist.
-  Never touches or alters `scraped_news`.
-
-Notes
------
-- Uses SQLAlchemy Core (raw SQL via text()) rather than an ORM, since the
-  schema is small and fixed — this keeps things simple and readable, which
-  matters more than ORM abstraction for a project this size.
-- Schema DDL lives in sql/create_tables.sql and sql/indexes.sql, not in this
-  file — init_schema() reads and executes those files. This keeps the SQL
-  reviewable/editable on its own, separate from Python logic.
-- All CREATE TABLE statements use `IF NOT EXISTS`, so init_schema() is safe
-  to run repeatedly. Index creation is NOT re-run-safe on every MySQL
-  version (CREATE INDEX has no IF NOT EXISTS in older MySQL), so
-  init_schema() only creates indexes the first time — see create_indexes().
 """
 
 import os

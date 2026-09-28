@@ -1,8 +1,7 @@
 """
 test_deduplication.py
 
-How to run:
-    python tests/test_deduplication.py
+
 """
 
 import sys, os

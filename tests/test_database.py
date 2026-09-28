@@ -1,16 +1,6 @@
 """
 test_database.py
 
-How to run:
-    python tests/test_database.py
-
-What it checks:
-1. Connection to MySQL succeeds using your .env credentials.
-2. Schema creation runs without error.
-3. All 8 processed tables exist.
-4. scraped_news is visible and has rows (sanity check on your 3000 rows).
-5. get_unprocessed_article_ids() returns ids (should be ~3000 on first run,
-   since nothing has been processed yet).
 """
 
 import sys

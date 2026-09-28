@@ -1,11 +1,3 @@
--- create_tables.sql
--- No FOREIGN KEY constraints — enforced at the application level instead
--- (the Python pipeline is the only writer, and always populates article_id
--- from processed_news, so referential integrity holds in practice without
--- fighting MySQL's ALTER-TABLE-ADD-FK data-dictionary caching bug).
--- article_id columns are still indexed for join/lookup performance —
--- see indexes.sql.
--- Never touches scraped_news (the raw table).
 
 CREATE TABLE IF NOT EXISTS processed_news (
     article_id            BIGINT PRIMARY KEY,

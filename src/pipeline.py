@@ -6,26 +6,6 @@ Purpose
 Wires cleaning.py + date_processing.py + deduplication.py + database.py
 together into the two functions Step 26 requires:
 
-    process_existing_articles()  — batch-processes the whole scraped_news
-                                    backlog, skipping already-COMPLETED rows.
-    process_new_article(id)      — processes one newly-scraped article.
-
-Current scope: validation -> date normalization -> cleaning -> dedup ->
-storage in processed_news. Sentiment/topics/keywords/NER are NOT called
-here yet — those modules don't exist yet. Once they do, this file gets
-extended (not rewritten) to call them after cleaning succeeds.
-
-Design note on batch vs. single-article dedup
------------------------------------------------
-Deduplication is inherently a corpus-level operation (you can only find a
-duplicate by comparing against other articles). process_existing_articles()
-runs deduplication.assign_duplicate_status() across the whole batch being
-processed, grouped by day, per its own design.
-
-process_new_article() only has ONE new row to work with, so it instead
-compares that single article against already-processed articles from the
-same day (pulled from the DB) plus a corpus-wide content-hash set — see
-_check_single_article_duplicate() below.
 """
 
 import pandas as pd

@@ -1,8 +1,6 @@
 """
 test_date_processing.py
 
-How to run:
-    python tests/test_date_processing.py
 
 Tests normalize_date() against real values confirmed from the dataset,
 plus edge cases (empty, garbage, wrong format) that must fail safely.

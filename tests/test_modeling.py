@@ -4,10 +4,7 @@ test_modeling.py
 How to run:
     python tests/test_modeling.py
 
-Uses synthetic data shaped like the real crisis pattern (elevated features
-in pre-crisis weeks, baseline elsewhere) across 2 synthetic crisis events,
-so LOCO validation and lead-time detection can be verified against known
-ground truth. sklearn itself is not mocked — this tests real model fitting.
+
 """
 
 import sys, os

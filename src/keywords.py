@@ -7,24 +7,6 @@ Step 9: extracts the top N meaningful keywords/keyphrases per article using
 KeyBERT, reusing the same sentence-transformer embedding model as topics.py
 (all-MiniLM-L6-v2) — no need to load a second embedding model.
 
-Input
------
-content_clean text (from processed_news, for COMPLETED articles).
-
-Output
-------
-Writes to article_keywords: article_id, keyword, score, rank (1 = most
-relevant). Composite key (article_id, rank) matches the existing schema.
-
-Design notes
-------------
-- n-gram range (1, 2) captures both single words and short phrases
-  ("fuel", "fuel shortage", "central bank") — phrases are often more
-  informative than single words for tracking crisis-relevant terms.
-- use_mmr=True (Maximal Marginal Relevance) reduces redundancy in the top-N
-  keywords for a single article (e.g. avoids returning "fuel", "fuel price",
-  "fuel prices" as 3 separate near-duplicate keywords).
-- Processes in batches with progress printing, same pattern as sentiment.py.
 """
 
 import utils

@@ -1,8 +1,6 @@
 """
 test_pipeline.py
 
-How to run:
-    python tests/test_pipeline.py
 
 Uses an in-memory fake in place of database.py's DB-touching functions, so
 this test runs fast and doesn't need a real MySQL connection. It verifies

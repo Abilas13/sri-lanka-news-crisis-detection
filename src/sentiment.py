@@ -3,39 +3,11 @@ sentiment.py
 
 Purpose
 -------
-Step 7: runs a pretrained transformer sentiment model over content_clean
+runs a pretrained transformer sentiment model over content_clean
 and writes results to article_sentiment. No fine-tuning — pretrained model
 only, per the project's time-limited scope.
 
-Input
------
-content_clean text (from processed_news, for articles with
-processing_status = 'COMPLETED').
 
-Output
-------
-Writes to article_sentiment: article_id, sentiment ('positive'/'neutral'/
-'negative'), sentiment_score (model confidence, 0-1), sentiment_model
-(the model name used, so results are traceable to a specific version).
-
-Model
------
-cardiffnlp/twitter-roberta-base-sentiment-latest — a RoBERTa model
-pretrained for 3-class sentiment (negative/neutral/positive), widely used
-and well-documented. Handles long text via truncation (RoBERTa's max input
-is 512 tokens; articles longer than that are truncated, not rejected —
-this is a reasonable simplification for a time-limited research project,
-since the opening of a news article is usually where its overall tone is
-set).
-
-Evaluation
-----------
-This module does NOT include the manual evaluation-sample step (Step 7 of
-the original brief asks for the model to be checked against ~100-150
-hand-labeled articles). That's a research task for you to do separately —
-pull a random sample via get_sentiment_eval_sample() below, label it by
-hand, and compare against the model's output. See the bottom of this file
-for a starter for that comparison.
 """
 
 import utils

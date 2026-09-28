@@ -6,45 +6,6 @@ Purpose
 Step 10: extracts named entities (people, organizations, locations, events,
 money amounts) using spaCy, for tracking entity frequency over time.
 
-Input
------
-content_clean text (from processed_news, for COMPLETED articles).
-
-Output
-------
-Writes to article_entities: article_id, entity, entity_type, confidence.
-
-Entity types kept
-------------------
-Filtered down to the six types the research brief asks for, mapped from
-spaCy's native labels:
-    PERSON -> PERSON
-    ORG    -> ORGANIZATION
-    GPE    -> LOCATION   (spaCy doesn't distinguish country vs city/region —
-                           see note below)
-    LOC    -> LOCATION
-    EVENT  -> EVENT
-    MONEY  -> MONEY
-Everything else spaCy detects (DATE, CARDINAL, NORP, FAC, PRODUCT, LAW,
-ORDINAL, PERCENT, QUANTITY, TIME, WORK_OF_ART) is dropped — not useful for
-this research and matches the brief's "NER is a supporting feature, don't
-over-invest in it" guidance.
-
-Note on COUNTRY vs LOCATION
------------------------------
-spaCy's GPE label covers countries, cities, and states/provinces without
-distinction — there's no reliable way to separate "Sri Lanka" from
-"Colombo" without a separate country-name lookup, which is more complexity
-than this supporting feature warrants. Both are stored as LOCATION.
-
-Note on confidence
---------------------
-spaCy's standard pipeline does NOT provide real per-entity confidence
-probabilities (that requires beam-search decoding, which is slower and
-unnecessary here). confidence is instead the entity's MENTION COUNT within
-that article — how many times it appears — a reasonable proxy for salience,
-clearly not a model probability. Document this if you cite it in your
-write-up.
 """
 
 from collections import Counter

@@ -3,40 +3,12 @@ temporal_analysis.py
 
 Purpose
 -------
-The CORE of this research (Steps 11-13):
-  11. Final article-level dataset (join sentiment + topics per article)
-  12. Weekly temporal aggregation
-  13. Trend features (change, growth rate, moving averages)
 
-Does NOT include anomaly detection (rolling z-score) or crisis-window
-labeling — those are Step 16 and Steps 14-15 respectively, built in
-crisis_analysis.py next, which consumes this module's output.
+Final article-level dataset (join sentiment + topics per article)
+Weekly temporal aggregation
+Trend features (change, growth rate, moving averages)
 
-Tracked topics/keywords/entity-types
---------------------------------------
-Per the brief's "focus on interpretable features, don't create hundreds of
-columns" guidance, only a small, deliberately chosen set of topics and
-keywords get individual frequency columns — the ones with clear crisis
-relevance, decided during topics.py's manual naming step:
 
-    fuel_topic_frequency              <- "Fuel & Oil Prices" + "Fuel QR System & Rationing"
-    iran_war_topic_frequency          <- "Iran War & Geopolitics"
-    electricity_topic_frequency       <- "Electricity Tariffs & Tax"
-    corruption_topic_frequency        <- "Arrests, Bribery & Corruption"
-    healthcare_strike_topic_frequency <- "Healthcare Worker Strikes (GMOA)"
-    consumer_prices_topic_frequency   <- "Consumer Prices & Food"
-    disaster_recovery_topic_frequency <- "General Sri Lanka News (Ditwah Relief...)"
-
-    fuel_keyword_frequency, shortage_keyword_frequency,
-    protest_keyword_frequency, crisis_keyword_frequency
-        <- substring match against article_keywords.keyword
-
-    {person,organization,location,event,money}_entity_frequency
-        <- count of article_entities rows per week per entity_type
-
-Adjust TRACKED_TOPIC_GROUPS / TRACKED_KEYWORDS below if your own topic
-names came out differently — these must match your actual applied topic
-names from topics.apply_topic_names().
 """
 
 import pandas as pd

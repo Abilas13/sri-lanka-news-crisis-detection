@@ -3,40 +3,10 @@ topics.py
 
 Purpose
 -------
-Step 8: identifies major topics across the corpus using BERTopic +
+identifies major topics across the corpus using BERTopic +
 sentence-transformer embeddings, and tracks how they change over time
 (via article_topics -> temporal_analysis.py later).
 
-Input
------
-title_clean + content_clean for every COMPLETED article (combined, since
-titles carry strong topical signal in news and keep embeddings shorter/faster).
-
-Output
-------
-Writes to article_topics: article_id, topic_id, topic_name, topic_probability.
-Also saves the fitted model to models/topics/ and a topic_info.csv summary
-to the same folder for manual review/naming.
-
-Manual step required
----------------------
-BERTopic produces numbered clusters with auto-generated names (top 3
-keywords, e.g. "fuel_shortage_prices") as a reasonable default. Review
-models/topics/topic_info.csv, decide on human-readable names (e.g. "Fuel"),
-then call apply_topic_names() with your mapping — this is the one-time
-manual step the project brief calls for, not a per-article task.
-
-Design notes
-------------
-- min_topic_size controls cluster granularity. Larger = fewer, broader
-  topics. Started at 15; if you get one giant catch-all topic (-1, "outlier")
-  dominating, lower it; if you get too many tiny fragmented topics, raise it.
-- Topic modeling is refit from scratch each time process_all_topics() runs
-  (not incremental) — appropriate for a fixed historical research corpus.
-  If you later add BERTopic to process_new_article() for live incoming
-  articles, that would need model.transform() on the saved model instead of
-  refitting — not implemented here since it's out of scope for the current
-  research pipeline.
 """
 
 import os

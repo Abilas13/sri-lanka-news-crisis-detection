@@ -1,32 +1,3 @@
-"""
-cleaning.py
-
-Purpose
--------
-Two responsibilities, kept together since both operate on the same raw
-title/content before anything else touches them:
-  1. Validation (Step 2) — is this article usable at all?
-  2. Text cleaning (Step 3) + basic length features (Step 6).
-
-Input
------
-Raw title, content strings as they come from scraped_news.
-
-Output
-------
-validate_article(article: dict) -> (bool, str)
-    Whether the article passes validation, and why not if it fails.
-
-clean_article(title: str, content: str) -> dict
-    {
-        'title_clean', 'content_clean',
-        'article_length_words', 'article_length_chars', 'sentence_count'
-    }
-
-Nothing here touches the database — pipeline.py wires this together with
-database.py. Keeping cleaning pure (no DB calls) makes it independently
-testable, which is the point of tests/test_cleaning.py.
-"""
 
 import re
 from bs4 import BeautifulSoup

@@ -1,8 +1,6 @@
 """
 test_cleaning.py
 
-How to run:
-    python tests/test_cleaning.py
 """
 
 import sys, os

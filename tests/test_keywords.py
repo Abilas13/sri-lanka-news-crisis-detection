@@ -1,12 +1,6 @@
 """
 test_keywords.py
 
-How to run:
-    python tests/test_keywords.py
-
-Mocks KeyBERT and the database layer — verifies batching, rank assignment,
-empty-text handling, and DB wiring without needing keybert/sentence-transformers
-installed or a real MySQL connection.
 """
 
 import sys, os

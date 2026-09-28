@@ -1,7 +1,3 @@
--- indexes.sql
--- Run after create_tables.sql. Since we no longer use FOREIGN KEY
--- constraints (see create_tables.sql comment), article_id columns need
--- explicit indexes here for join/lookup performance.
 
 CREATE INDEX idx_published_at ON processed_news (published_at);
 CREATE INDEX idx_content_hash ON processed_news (content_hash);
