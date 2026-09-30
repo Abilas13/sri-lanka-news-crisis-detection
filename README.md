@@ -56,38 +56,42 @@ Every stage writes to its own MySQL table, keyed by `article_id` back to the ori
 ```
 |-- config.py                  # DB connection settings, pipeline constants
 |-- requirements.txt
-|-- .env.example                # copy to .env with your real MySQL credentials
+|-- .env.
 |
 |-- sql/
 |   |-- create_tables.sql       # 8 processed-data tables (no FKs -- see Notes)
 |   |-- indexes.sql
 |   |-- seed_crisis_events.sql
-|   |-- cleanup_crisis_events.sql
-|   `-- alter_temporal_features.sql
+|  
+|-- data/
+|   |-- scraped_news/
+|   |-- processed/   
 |
 |-- src/
 |   |-- database.py              # all DB connectivity/queries
 |   |-- utils.py                 # shared helpers (hashing, ISO week conversion, logging)
-|   |-- cleaning.py               # Step 2-3, 6: validation, text cleaning, basic features
-|   |-- date_processing.py        # Step 3: date normalization
-|   |-- deduplication.py           # Step 4: exact + near-duplicate detection
-|   |-- sentiment.py               # Step 7: sentiment analysis
-|   |-- topics.py                  # Step 8: BERTopic topic modeling
-|   |-- keywords.py                # Step 9: KeyBERT keyword extraction
-|   |-- ner.py                     # Step 10: named entity recognition
-|   |-- temporal_analysis.py        # Steps 11-13: weekly aggregation, trend features
-|   |-- crisis_analysis.py          # Steps 14-16, 18: crisis windows, anomaly detection
-|   |-- modeling.py                 # Steps 17, 19-20: ML classification, lead-time analysis
+|   |-- cleaning.py               # validation, text cleaning, basic features
+|   |-- date_processing.py        # date normalization
+|   |-- deduplication.py           # exact + near-duplicate detection
+|   |-- sentiment.py               # sentiment analysis
+|   |-- topics.py                  # BERTopic topic modeling
+|   |-- keywords.py                # KeyBERT keyword extraction
+|   |-- ner.py                     # named entity recognition
+|   |-- temporal_analysis.py        # weekly aggregation, trend features
+|   |-- crisis_analysis.py          # crisis windows, anomaly detection
+|   |-- modeling.py                 # ML classification, lead-time analysis
 |   |-- evaluate_sentiment.py       # sentiment model evaluation vs. hand-labeled sample
 |   `-- pipeline.py                 # orchestration: process_existing_articles / process_new_article
 |
 |-- notebooks/
-|   |-- 00_data_check.ipynb
-|   |-- 01_eda.ipynb
-|   |-- 02_nlp.ipynb
-|   |-- 03_topics.ipynb
-|   |-- 04_temporal_analysis.ipynb
-|   `-- 05_crisis_analysis.ipynb
+|   |-- 00_data_scrape.ipynb
+|   |-- 01_data_check.ipynb
+|   |-- 02_eda.ipynb
+|   |-- 03_nlp.ipynb
+|   |-- 04_topics.ipynb
+|   |-- 05_temporal_analysis.ipynb
+|   `-- 06_crisis_analysis.ipynb
+|   |-- 
 |
 |-- tests/                       # one test file per src/ module (mocked, no live DB needed)
 |-- models/                      # saved BERTopic model, topic_info.csv
